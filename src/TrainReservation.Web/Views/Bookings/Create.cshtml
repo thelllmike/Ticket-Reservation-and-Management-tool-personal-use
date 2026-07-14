@@ -1,0 +1,15 @@
+@model BookingFormModel
+@{
+    ViewData["Title"] = "New booking";
+}
+
+<div class="mb-4">
+    <h1 class="h3 mb-1">New booking</h1>
+    <p class="text-muted mb-0">Pick a route and date, choose a service and seats, then confirm.</p>
+</div>
+
+<partial name="_BookingForm" model="Model" />
+
+@section Scripts {
+    <partial name="_BookingFormScripts" model="Model" />
+}

@@ -1,0 +1,124 @@
+@model WeeklyViewModel
+@{
+    ViewData["Title"] = "Weekly view";
+    var week = Model.Week;
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+        <h1 class="h3 mb-1">Weekly view</h1>
+        <p class="text-muted mb-0">
+            @week.WeekStart.ToString("d MMM") – @week.WeekEnd.ToString("d MMM yyyy")
+            · @week.TotalBookings trip(s) · @week.TotalSpecialRequests request(s) · £@week.TotalSpend.ToString("0.00")
+        </p>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-week="@Model.PreviousWeek.ToString("yyyy-MM-dd")">← Previous</a>
+        <a class="btn btn-outline-secondary" asp-action="Index">This week</a>
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-week="@Model.NextWeek.ToString("yyyy-MM-dd")">Next →</a>
+        <a class="btn btn-primary" asp-action="Report" asp-route-week="@week.WeekStart.ToString("yyyy-MM-dd")">Report</a>
+    </div>
+</div>
+
+<div class="week-grid">
+    @foreach (var day in week.Days)
+    {
+        <div class="card shadow-sm day-card @(day.IsToday ? "today" : "")">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">@day.Date.ToString("ddd")</span>
+                <span class="text-muted">@day.Date.ToString("d MMM")</span>
+            </div>
+
+            <div class="card-body p-2">
+                @if (day.Occurrences.Count == 0)
+                {
+                    <div class="text-muted small text-center py-3">—</div>
+                }
+                else
+                {
+                    @foreach (var occurrence in day.Occurrences)
+                    {
+                        var booking = occurrence.Booking;
+                        var service = booking.TrainService;
+                        var cancelled = booking.Status == BookingStatus.Cancelled;
+
+                        <div class="occurrence border rounded p-2 mb-2 @(occurrence.IsGenerated ? "recurring" : "") @(cancelled ? "cancelled" : "")">
+                            <div class="fw-semibold text-truncate" title="@(service?.Route?.Description)">
+                                @(service?.Route?.Description ?? "—")
+                            </div>
+
+                            <div class="text-muted">
+                                @if (service is not null)
+                                {
+                                    <text>@service.DepartureTime.ToString("HH\\:mm") · @service.TrainNumber</text>
+                                }
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <span>£@booking.TotalPrice.ToString("0.00")</span>
+                                <partial name="_StatusBadge" model="booking.Status" />
+                            </div>
+
+                            @if (booking.SpecialRequests.Count > 0)
+                            {
+                                <div class="mt-1">
+                                    @foreach (var request in booking.SpecialRequests)
+                                    {
+                                        <span class="badge bg-light text-dark border" title="@request.Description">@request.Type</span>
+                                    }
+                                </div>
+                            }
+
+                            @if (occurrence.IsGenerated)
+                            {
+                                @* Generated from a pattern — it has no Booking of its own yet. Acting on
+                                   just this date first splits it out into a booking the user can change. *@
+                                <div class="mt-2 d-flex gap-1">
+                                    <form asp-controller="Bookings" asp-action="MaterialiseOccurrence" method="post" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="seriesId" value="@occurrence.SeriesId" />
+                                        <input type="hidden" name="date" value="@occurrence.Date.ToString("yyyy-MM-dd")" />
+                                        <input type="hidden" name="action" value="edit" />
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                style="font-size:.7rem" title="Split this date out of the series and edit it">
+                                            Edit this one
+                                        </button>
+                                    </form>
+
+                                    <form asp-controller="Bookings" asp-action="MaterialiseOccurrence" method="post" class="d-inline"
+                                          onsubmit="return confirm('Cancel only the @occurrence.Date.ToString("d MMM") occurrence? The rest of the series stays.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="seriesId" value="@occurrence.SeriesId" />
+                                        <input type="hidden" name="date" value="@occurrence.Date.ToString("yyyy-MM-dd")" />
+                                        <input type="hidden" name="action" value="cancel" />
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                style="font-size:.7rem" title="Cancel only this date">
+                                            Skip
+                                        </button>
+                                    </form>
+                                </div>
+
+                                <div class="small text-muted mt-1" style="font-size:.65rem">
+                                    from series @booking.Reference
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="mt-2">
+                                    <a class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem"
+                                       asp-controller="Bookings" asp-action="Details" asp-route-id="@booking.Id">Open</a>
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div class="mt-4 small text-muted">
+    <span class="badge" style="background-color:#6f42c1">Purple</span> occurrences are generated from a
+    recurring pattern — they are not stored as bookings until you change one.
+</div>

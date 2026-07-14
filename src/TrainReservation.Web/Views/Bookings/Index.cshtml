@@ -1,0 +1,165 @@
+@model BookingListViewModel
+@{
+    ViewData["Title"] = "Bookings";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">Bookings</h1>
+    <a class="btn btn-primary" asp-action="Create">+ New booking</a>
+</div>
+
+@if (Model.Recurring.Count > 0)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <strong>Recurring</strong>
+            <span class="text-muted small">— stored once and expanded into occurrences in the weekly view</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Reference</th>
+                    <th>Route</th>
+                    <th>Repeats</th>
+                    <th>Runs until</th>
+                    <th>Status</th>
+                    <th class="text-end">Per trip</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var booking in Model.Recurring)
+                {
+                    var pattern = booking.RecurrencePattern!;
+                    <tr>
+                        <td class="fw-semibold">@booking.Reference</td>
+                        <td>@(booking.TrainService?.Route?.Description ?? "—")</td>
+                        <td>
+                            <span class="badge bg-purple" style="background-color:#6f42c1">@pattern.Frequency</span>
+                            <span class="small text-muted">
+                                every @(pattern.Interval == 1 ? "" : pattern.Interval + " ")@(pattern.Frequency switch {
+                                    Frequency.Daily => pattern.Interval == 1 ? "day" : "days",
+                                    Frequency.Weekly => pattern.Interval == 1 ? "week" : "weeks",
+                                    _ => pattern.Interval == 1 ? "month" : "months"
+                                })
+                                @if (pattern.DaysOfWeek.Length > 0)
+                                {
+                                    <text>on @string.Join(", ", pattern.DaysOfWeek.Select(d => d.ToString()[..3]))</text>
+                                }
+                            </span>
+                        </td>
+                        <td class="small">@pattern.EndDate.ToString("d MMM yyyy")</td>
+                        <td><partial name="_StatusBadge" model="booking.Status" /></td>
+                        <td class="text-end">£@booking.TotalPrice.ToString("0.00")</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@booking.Id">View</a>
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@booking.Id">Edit</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-white"><strong>Upcoming</strong></div>
+
+    @if (Model.Upcoming.Count == 0)
+    {
+        <div class="card-body text-muted">No upcoming trips.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Reference</th>
+                    <th>Date</th>
+                    <th>Route</th>
+                    <th>Train</th>
+                    <th>Seats</th>
+                    <th>Status</th>
+                    <th class="text-end">Total</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var booking in Model.Upcoming)
+                {
+                    <tr>
+                        <td class="fw-semibold">
+                            @booking.Reference
+                            @if (booking.ParentBookingId is not null)
+                            {
+                                <span class="badge bg-light text-dark border" title="Split out of a recurring series">from series</span>
+                            }
+                        </td>
+                        <td>@booking.TravelDate.ToString("ddd d MMM")</td>
+                        <td>@(booking.TrainService?.Route?.Description ?? "—")</td>
+                        <td class="small">
+                            @if (booking.TrainService is not null)
+                            {
+                                <text>@booking.TrainService.DepartureTime.ToString("HH\\:mm") · @booking.TrainService.TrainNumber</text>
+                            }
+                        </td>
+                        <td class="small">@string.Join(", ", booking.Seats.Select(s => s.Label))</td>
+                        <td><partial name="_StatusBadge" model="booking.Status" /></td>
+                        <td class="text-end">£@booking.TotalPrice.ToString("0.00")</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@booking.Id">View</a>
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@booking.Id">Edit</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white"><strong>Past</strong></div>
+
+    @if (Model.Past.Count == 0)
+    {
+        <div class="card-body text-muted">No past trips.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Reference</th>
+                    <th>Date</th>
+                    <th>Route</th>
+                    <th>Seats</th>
+                    <th>Status</th>
+                    <th class="text-end">Total</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var booking in Model.Past)
+                {
+                    <tr class="text-muted">
+                        <td>@booking.Reference</td>
+                        <td>@booking.TravelDate.ToString("ddd d MMM yyyy")</td>
+                        <td>@(booking.TrainService?.Route?.Description ?? "—")</td>
+                        <td class="small">@string.Join(", ", booking.Seats.Select(s => s.Label))</td>
+                        <td><partial name="_StatusBadge" model="booking.Status" /></td>
+                        <td class="text-end">£@booking.TotalPrice.ToString("0.00")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@booking.Id">View</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

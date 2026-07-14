@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TrainReservation.Services\TrainReservation.Services.csproj" />
+    <ProjectReference Include="..\TrainReservation.Data\TrainReservation.Data.csproj" />
+    <ProjectReference Include="..\TrainReservation.Domain\TrainReservation.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

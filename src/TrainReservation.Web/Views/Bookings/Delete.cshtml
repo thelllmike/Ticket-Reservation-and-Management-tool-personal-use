@@ -1,0 +1,54 @@
+@model Booking
+@{
+    ViewData["Title"] = "Delete booking";
+}
+
+<h1 class="h3 mb-4">Delete booking</h1>
+
+<div class="card shadow-sm border-danger">
+    <div class="card-header bg-danger text-white">
+        <strong>This cannot be undone</strong>
+    </div>
+    <div class="card-body">
+        <p>You are about to permanently delete this booking.</p>
+
+        <dl class="row">
+            <dt class="col-sm-3 text-muted">Reference</dt>
+            <dd class="col-sm-9">@Model.Reference</dd>
+
+            <dt class="col-sm-3 text-muted">Route</dt>
+            <dd class="col-sm-9">@(Model.TrainService?.Route?.Description ?? "—")</dd>
+
+            <dt class="col-sm-3 text-muted">Travel date</dt>
+            <dd class="col-sm-9">
+                @if (Model.IsRecurring)
+                {
+                    <span class="text-danger">
+                        This is a recurring series — deleting it removes every future occurrence,
+                        along with any occurrences already split out of it.
+                    </span>
+                }
+                else
+                {
+                    @Model.TravelDate.ToString("dddd d MMMM yyyy")
+                }
+            </dd>
+
+            <dt class="col-sm-3 text-muted">Seats</dt>
+            <dd class="col-sm-9">@string.Join(", ", Model.Seats.Select(s => s.Label))</dd>
+
+            <dt class="col-sm-3 text-muted">Total</dt>
+            <dd class="col-sm-9">£@Model.TotalPrice.ToString("0.00")</dd>
+        </dl>
+
+        <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger">Yes, delete it</button>
+            <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Id">Cancel</a>
+        </form>
+    </div>
+</div>
+
+<p class="text-muted small mt-3">
+    If you only want to stop travelling but keep the record, cancel the booking instead.
+</p>

@@ -1,0 +1,37 @@
+@model SpecialRequestListItem
+@{
+    ViewData["Title"] = "Delete special request";
+}
+
+<h1 class="h3 mb-4">Delete special request</h1>
+
+<div class="card shadow-sm border-danger">
+    <div class="card-header bg-danger text-white"><strong>This cannot be undone</strong></div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3 text-muted">Type</dt>
+            <dd class="col-sm-9">@Model.Request.Type</dd>
+
+            <dt class="col-sm-3 text-muted">Details</dt>
+            <dd class="col-sm-9">@Model.Request.Description</dd>
+
+            <dt class="col-sm-3 text-muted">Booking</dt>
+            <dd class="col-sm-9">
+                @if (Model.Booking is not null)
+                {
+                    <text>@Model.Booking.Reference — @(Model.Booking.TrainService?.Route?.Description ?? "—")</text>
+                }
+                else
+                {
+                    <text>—</text>
+                }
+            </dd>
+        </dl>
+
+        <form asp-action="Delete" asp-route-id="@Model.Request.Id" method="post" class="d-flex gap-2">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger">Yes, delete it</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        </form>
+    </div>
+</div>

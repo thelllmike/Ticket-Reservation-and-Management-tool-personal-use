@@ -1,0 +1,112 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Your travel at a glance</h1>
+        <p class="text-muted mb-0">Week of @Model.Week.WeekStart.ToString("d MMM") – @Model.Week.WeekEnd.ToString("d MMM yyyy")</p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">This week</div>
+                <div class="display-6">@Model.Week.TotalBookings</div>
+                <div class="small text-muted">trips booked</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">This week</div>
+                <div class="display-6">£@Model.Week.TotalSpend.ToString("0.00")</div>
+                <div class="small text-muted">total spend</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Open</div>
+                <div class="display-6">@Model.OpenRequestCount</div>
+                <div class="small text-muted">special requests</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small text-uppercase">Active</div>
+                <div class="display-6">@Model.RecurringCount</div>
+                <div class="small text-muted">recurring bookings</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Next trips</strong>
+                <a class="small" asp-controller="Bookings" asp-action="Index">All bookings →</a>
+            </div>
+
+            @if (Model.Upcoming.Count == 0)
+            {
+                <div class="card-body text-muted">
+                    Nothing booked yet. <a asp-controller="Bookings" asp-action="Create">Book a trip</a>.
+                </div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var booking in Model.Upcoming)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-semibold">@(booking.TrainService?.Route?.Description ?? "Unknown route")</div>
+                                <div class="small text-muted">
+                                    @booking.TravelDate.ToString("ddd d MMM")
+                                    @if (booking.TrainService is not null)
+                                    {
+                                        <text>· @booking.TrainService.DepartureTime.ToString("HH\\:mm") · @booking.TrainService.TrainNumber</text>
+                                    }
+                                    · @booking.Seats.Count seat(s)
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-semibold">£@booking.TotalPrice.ToString("0.00")</div>
+                                <a class="small" asp-controller="Bookings" asp-action="Details" asp-route-id="@booking.Id">Details</a>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white"><strong>Jump to</strong></div>
+            <div class="card-body d-grid gap-2">
+                <a class="btn btn-primary" asp-controller="Bookings" asp-action="Create">Book a trip</a>
+                <a class="btn btn-outline-secondary" asp-controller="Weekly" asp-action="Index">Weekly view</a>
+                <a class="btn btn-outline-secondary" asp-controller="Weekly" asp-action="Report">Weekly report</a>
+                <a class="btn btn-outline-secondary" asp-controller="Chat" asp-action="Index">Ask the prediction bot</a>
+
+                <hr class="my-2" />
+
+                <div class="small text-muted">
+                    @Model.ServiceCount train services in the schedule.
+                    Predictions are computed from the seeded booking history held in memory — no network, no database.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,104 @@
+html { font-size: 15px; }
+
+body { background-color: #f7f8fa; }
+
+.navbar-brand { letter-spacing: .3px; }
+
+/* ---- Weekly view -------------------------------------------------------------------------- */
+
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: .75rem;
+}
+
+/* Seven columns is unreadable on a phone; stack the days instead. */
+@media (max-width: 991px) {
+    .week-grid { grid-template-columns: 1fr; }
+}
+
+.day-card { min-height: 9rem; }
+
+.day-card.today {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, .15);
+}
+
+.day-card .card-header { font-size: .8rem; }
+
+.occurrence {
+    font-size: .78rem;
+    border-left: 3px solid #0d6efd;
+    background: #fff;
+}
+
+.occurrence.recurring { border-left-color: #6f42c1; }
+.occurrence.cancelled { border-left-color: #adb5bd; opacity: .6; }
+
+/* ---- Seat picker -------------------------------------------------------------------------- */
+
+.seat-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+}
+
+.seat {
+    width: 2.6rem;
+    height: 2.2rem;
+    font-size: .72rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* A seat already sold on this service and date. Not selectable. */
+.seat:disabled {
+    background: #e9ecef;
+    color: #adb5bd;
+    text-decoration: line-through;
+    border-color: #dee2e6;
+}
+
+/* ---- Chat ---------------------------------------------------------------------------------- */
+
+.chat-window {
+    max-height: 32rem;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.bubble {
+    max-width: 82%;
+    padding: .6rem .85rem;
+    border-radius: .9rem;
+    white-space: pre-wrap;
+}
+
+.bubble-user {
+    background: #0d6efd;
+    color: #fff;
+    border-bottom-right-radius: .2rem;
+}
+
+.bubble-bot {
+    background: #f1f3f5;
+    color: #212529;
+    border-bottom-left-radius: .2rem;
+}
+
+/* ---- Printing ------------------------------------------------------------------------------ */
+/* The weekly report is meant to be printed, so drop the chrome and flatten the colours. */
+
+@media print {
+    .no-print { display: none !important; }
+
+    body { background: #fff; }
+
+    main.container { max-width: 100%; padding: 0; }
+
+    .card { border: 1px solid #999 !important; box-shadow: none !important; }
+
+    a[href]:after { content: ""; }
+}

@@ -1,0 +1,27 @@
+@model TrainService
+@{
+    ViewData["Title"] = "Delete service";
+}
+
+<h1 class="h3 mb-4">Delete train service</h1>
+
+<div class="card shadow-sm border-danger">
+    <div class="card-header bg-danger text-white"><strong>This cannot be undone</strong></div>
+    <div class="card-body">
+        <p>
+            You are about to remove <strong>@Model.TrainNumber</strong>
+            (@(Model.Route?.Description ?? "—"), departing @Model.DepartureTime.ToString("HH\\:mm"))
+            from the schedule.
+        </p>
+
+        <p class="text-muted small">
+            A service that still has bookings against it cannot be deleted — cancel those bookings first.
+        </p>
+
+        <form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-danger">Yes, delete it</button>
+            <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+        </form>
+    </div>
+</div>

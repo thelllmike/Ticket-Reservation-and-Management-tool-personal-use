@@ -1,0 +1,17 @@
+@model BookingFormModel
+@{
+    ViewData["Title"] = "Edit booking";
+}
+
+<div class="mb-4">
+    <h1 class="h3 mb-1">Edit booking @Model.Reference</h1>
+    <p class="text-muted mb-0">
+        Seats already held by this booking stay selectable — only seats sold to another booking are blocked.
+    </p>
+</div>
+
+<partial name="_BookingForm" model="Model" />
+
+@section Scripts {
+    <partial name="_BookingFormScripts" model="Model" />
+}

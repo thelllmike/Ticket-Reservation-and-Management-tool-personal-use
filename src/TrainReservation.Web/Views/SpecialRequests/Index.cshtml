@@ -1,0 +1,87 @@
+@model List<SpecialRequestListItem>
+@{
+    ViewData["Title"] = "Special requests";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Special requests</h1>
+        <p class="text-muted mb-0">Assistance and extras attached to your bookings.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">+ Add request</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-muted">
+            No special requests yet. <a asp-action="Create">Add one</a>.
+        </div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                <tr>
+                    <th>Type</th>
+                    <th>Details</th>
+                    <th>Booking</th>
+                    <th>Travel date</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td class="fw-semibold">@item.Request.Type</td>
+                        <td class="small text-muted">@item.Request.Description</td>
+                        <td>
+                            @if (item.Booking is not null)
+                            {
+                                <a asp-controller="Bookings" asp-action="Details" asp-route-id="@item.Booking.Id">
+                                    @item.Booking.Reference
+                                </a>
+                                <div class="small text-muted">@(item.Booking.TrainService?.Route?.Description ?? "—")</div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
+                        <td class="small">
+                            @if (item.Booking is null)
+                            {
+                                <text>—</text>
+                            }
+                            else if (item.Booking.IsRecurring)
+                            {
+                                <span class="badge" style="background-color:#6f42c1">Recurring</span>
+                            }
+                            else
+                            {
+                                @item.Booking.TravelDate.ToString("ddd d MMM yyyy")
+                            }
+                        </td>
+                        <td>
+                            <span class="badge @(item.Request.Status switch {
+                                RequestStatus.Fulfilled => "bg-success",
+                                RequestStatus.Declined => "bg-danger",
+                                _ => "bg-warning text-dark"
+                            })">@item.Request.Status</span>
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@item.Request.Id">Edit</a>
+                            <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@item.Request.Id">Delete</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

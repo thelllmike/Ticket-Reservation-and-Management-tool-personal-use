@@ -1,0 +1,55 @@
+@model SpecialRequestFormModel
+
+<form asp-action="@(Model.IsEdit ? "Edit" : "Create")" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-12">
+                    <label asp-for="BookingId" class="form-label"></label>
+                    <select asp-for="BookingId" class="form-select">
+                        <option value="0">Choose a booking…</option>
+                        @foreach (var booking in Model.Bookings)
+                        {
+                            var label = booking.IsRecurring
+                                ? $"{booking.Reference} — {booking.TrainService?.Route?.Description} (recurring)"
+                                : $"{booking.Reference} — {booking.TrainService?.Route?.Description} on {booking.TravelDate:d MMM yyyy}";
+                            <option value="@booking.Id">@label</option>
+                        }
+                    </select>
+                    <span asp-validation-for="BookingId" class="text-danger small"></span>
+                    <div class="form-text">A request always belongs to exactly one booking.</div>
+                </div>
+
+                <div class="col-md-5">
+                    <label asp-for="Type" class="form-label"></label>
+                    <select asp-for="Type" class="form-select" asp-items="Html.GetEnumSelectList<RequestType>()"></select>
+                </div>
+
+                <div class="col-md-7">
+                    <label asp-for="Status" class="form-label"></label>
+                    <select asp-for="Status" class="form-select" asp-items="Html.GetEnumSelectList<RequestStatus>()"></select>
+                </div>
+
+                <div class="col-12">
+                    <label asp-for="Description" class="form-label"></label>
+                    <textarea asp-for="Description" class="form-control" rows="3"
+                              placeholder="Anything the train operator needs to know."></textarea>
+                    <span asp-validation-for="Description" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                    @(Model.IsEdit ? "Save changes" : "Add request")
+                </button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </div>
+    </div>
+</form>

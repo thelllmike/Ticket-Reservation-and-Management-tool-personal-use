@@ -1,0 +1,177 @@
+@model ChatViewModel
+@using System.Text.Encodings.Web
+@using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Html
+@{
+    ViewData["Title"] = "Predictions";
+
+    // The prediction service writes its replies with **bold** and _italic_ markers. Escape the text
+    // first and only then turn those markers into tags — so the reply can never inject markup.
+    IHtmlContent Format(string text)
+    {
+        var safe = HtmlEncoder.Default.Encode(text);
+        safe = Regex.Replace(safe, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+        safe = Regex.Replace(safe, @"_(.+?)_", "<em>$1</em>");
+        return new HtmlString(safe);
+    }
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Prediction chatbot</h1>
+        <p class="text-muted mb-0">
+            Ask about pricing or availability. Answers are computed from the booking history held in
+            memory — no model, no network.
+        </p>
+    </div>
+
+    @if (Model.Transcript.Count > 0)
+    {
+        <form asp-action="Clear" method="post">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-secondary btn-sm">Clear chat</button>
+        </form>
+    }
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body chat-window" id="chat">
+                @if (Model.Transcript.Count == 0)
+                {
+                    <div class="text-center text-muted py-5">
+                        <div class="display-6 mb-2">🤖</div>
+                        <p class="mb-1">Ask me something like:</p>
+                        <p class="mb-0 small">
+                            “What will a London to Manchester ticket cost next Friday?”<br />
+                            “Will there be seats on the 08:00 to Leeds next Monday?”
+                        </p>
+                    </div>
+                }
+
+                @foreach (var message in Model.Transcript)
+                {
+                    <div class="d-flex mb-3 @(message.FromUser ? "justify-content-end" : "justify-content-start")">
+                        <div class="bubble @(message.FromUser ? "bubble-user" : "bubble-bot")">
+                            @Format(message.Text)
+
+                            @* Show the working behind the answer, not just the answer. *@
+                            @if (message.Prediction is { SampleSize: > 0 } p)
+                            {
+                                <div class="mt-2 pt-2 border-top">
+                                    <div class="small text-muted mb-1">Supporting figures</div>
+                                    <table class="table table-sm mb-0 small">
+                                        <tbody>
+                                        <tr>
+                                            <td class="text-muted">Projected fare</td>
+                                            <td class="text-end fw-semibold">£@p.ProjectedPrice.ToString("0.00")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Recent average (4 wks)</td>
+                                            <td class="text-end">£@p.RecentAveragePrice.ToString("0.00")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Earlier average</td>
+                                            <td class="text-end">£@p.OlderAveragePrice.ToString("0.00")</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Trend</td>
+                                            <td class="text-end">
+                                                <span class="badge @(p.Trend switch {
+                                                    TrendDirection.Rising => "bg-danger",
+                                                    TrendDirection.Easing => "bg-success",
+                                                    _ => "bg-secondary"
+                                                })">@p.Trend @p.TrendPercent.ToString("+0.0;-0.0;0.0")%</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Typical occupancy</td>
+                                            <td class="text-end">@((p.AverageOccupancy * 100).ToString("0"))%</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Availability</td>
+                                            <td class="text-end">
+                                                <span class="badge @(p.Availability switch {
+                                                    AvailabilityLevel.LikelyFull => "bg-danger",
+                                                    AvailabilityLevel.Limited => "bg-warning text-dark",
+                                                    _ => "bg-success"
+                                                })">@p.Availability</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-muted">Sample / confidence</td>
+                                            <td class="text-end">@p.SampleSize day(s) · @p.Confidence</td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="card-footer bg-white">
+                <form asp-action="Ask" method="post" class="d-flex gap-2">
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="question" class="form-control" autocomplete="off" autofocus
+                           placeholder="e.g. What will a London to Manchester ticket cost next Friday?" />
+                    <button type="submit" class="btn btn-primary">Ask</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        @* The escape hatch: when the bot cannot tell what was meant, the user picks explicitly. *@
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white"><strong>Or pick directly</strong></div>
+            <div class="card-body">
+                <form asp-action="Predict" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div class="mb-3">
+                        <label class="form-label small">Route</label>
+                        <select name="routeId" class="form-select form-select-sm" required>
+                            <option value="">Choose a route…</option>
+                            @foreach (var route in Model.Routes)
+                            {
+                                <option value="@route.Id">@route.Description</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small">Date</label>
+                        <input type="date" name="date" class="form-control form-control-sm" required
+                               value="@Model.Date?.ToString("yyyy-MM-dd")" />
+                    </div>
+
+                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">Predict</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><strong>How it works</strong></div>
+            <div class="card-body small text-muted">
+                <p><strong>Pricing</strong> — a moving average of what seats on the route have actually
+                    sold for, split into a recent and an earlier window to get a trend, then projected
+                    to your date and adjusted for how busy that weekday usually is.</p>
+
+                <p class="mb-0"><strong>Availability</strong> — historical occupancy (seats sold ÷
+                    capacity) for that route on that day of the week, classified as likely available,
+                    limited, or likely full.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Keep the newest message in view.
+        const chat = document.getElementById('chat');
+        if (chat) chat.scrollTop = chat.scrollHeight;
+    </script>
+}

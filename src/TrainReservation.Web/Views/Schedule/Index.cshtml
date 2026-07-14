@@ -1,0 +1,60 @@
+@model List<TrainService>
+@{
+    ViewData["Title"] = "Schedule";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Schedule</h1>
+        <p class="text-muted mb-0">The train services available to book.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">+ Add service</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+                <th>Train</th>
+                <th>Route</th>
+                <th>Departs</th>
+                <th>Arrives</th>
+                <th>Operating days</th>
+                <th class="text-end">Seats</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var service in Model)
+            {
+                <tr>
+                    <td class="fw-semibold">@service.TrainNumber</td>
+                    <td>@(service.Route?.Description ?? "—")</td>
+                    <td>@service.DepartureTime.ToString("HH\\:mm")</td>
+                    <td>@service.ArrivalTime.ToString("HH\\:mm")</td>
+                    <td>
+                        @if (service.OperatingDays.Length == 7)
+                        {
+                            <span class="badge bg-light text-dark border">Every day</span>
+                        }
+                        else
+                        {
+                            @foreach (var day in service.OperatingDays.OrderBy(d => ((int)d + 6) % 7))
+                            {
+                                <span class="badge bg-light text-dark border">@day.ToString()[..3]</span>
+                            }
+                        }
+                    </td>
+                    <td class="text-end">@service.Capacity</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@service.Id">View</a>
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Edit" asp-route-id="@service.Id">Edit</a>
+                        <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@service.Id">Delete</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

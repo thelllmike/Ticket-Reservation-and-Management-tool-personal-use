@@ -1,0 +1,211 @@
+@model WeeklyViewModel
+@{
+    ViewData["Title"] = "Weekly report";
+    var week = Model.Week;
+
+    // Requests are summarised by type across the whole week, so the report answers
+    // "what assistance do I need arranging this week?" at a glance.
+    var requestsByType = week.Days
+        .SelectMany(d => d.SpecialRequests)
+        .GroupBy(r => r.Type)
+        .OrderByDescending(g => g.Count())
+        .ToList();
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4 no-print">
+    <div>
+        <h1 class="h3 mb-1">Weekly report</h1>
+        <p class="text-muted mb-0">A printable summary of the week.</p>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Report" asp-route-week="@Model.PreviousWeek.ToString("yyyy-MM-dd")">← Previous</a>
+        <a class="btn btn-outline-secondary" asp-action="Report">This week</a>
+        <a class="btn btn-outline-secondary" asp-action="Report" asp-route-week="@Model.NextWeek.ToString("yyyy-MM-dd")">Next →</a>
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-week="@week.WeekStart.ToString("yyyy-MM-dd")">Grid view</a>
+        <button class="btn btn-primary" onclick="window.print()">Print</button>
+    </div>
+</div>
+
+@* ---- Printed header --------------------------------------------------------------------- *@
+<div class="mb-4">
+    <h2 class="h4 mb-1">Travel report</h2>
+    <div class="text-muted">
+        Week of @week.WeekStart.ToString("dddd d MMMM yyyy") – @week.WeekEnd.ToString("dddd d MMMM yyyy")
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-3">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="text-muted small text-uppercase">Trips</div>
+                <div class="h4 mb-0">@week.TotalBookings</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-3">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="text-muted small text-uppercase">Requests</div>
+                <div class="h4 mb-0">@week.TotalSpecialRequests</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-3">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="text-muted small text-uppercase">Routes</div>
+                <div class="h4 mb-0">@week.RoutesTravelled.Count()</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-3">
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="text-muted small text-uppercase">Total spend</div>
+                <div class="h4 mb-0">£@week.TotalSpend.ToString("0.00")</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ---- Per-day breakdown ------------------------------------------------------------------ *@
+<div class="card mb-4">
+    <div class="card-header bg-white"><strong>By day</strong></div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+            <tr>
+                <th>Day</th>
+                <th>Trips</th>
+                <th>Routes &amp; times</th>
+                <th>Special requests</th>
+                <th class="text-end">Spend</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var day in week.Days)
+            {
+                <tr class="@(day.Occurrences.Count == 0 ? "text-muted" : "")">
+                    <td class="text-nowrap">
+                        <strong>@day.Date.ToString("ddd")</strong>
+                        <div class="small text-muted">@day.Date.ToString("d MMM")</div>
+                    </td>
+
+                    <td>@day.Occurrences.Count</td>
+
+                    <td>
+                        @if (day.Occurrences.Count == 0)
+                        {
+                            <span class="small">No travel</span>
+                        }
+                        else
+                        {
+                            @foreach (var occurrence in day.Occurrences)
+                            {
+                                var service = occurrence.Booking.TrainService;
+                                <div class="small">
+                                    @if (service is not null)
+                                    {
+                                        <span class="fw-semibold">@service.DepartureTime.ToString("HH\\:mm")</span>
+                                        <text>→ @service.ArrivalTime.ToString("HH\\:mm")</text>
+                                    }
+                                    @(service?.Route?.Description ?? "—")
+
+                                    @if (occurrence.IsGenerated)
+                                    {
+                                        <span class="badge bg-light text-dark border">recurring</span>
+                                    }
+                                    @if (occurrence.Booking.Status == BookingStatus.Cancelled)
+                                    {
+                                        <span class="badge bg-secondary">cancelled</span>
+                                    }
+                                </div>
+                            }
+                        }
+                    </td>
+
+                    <td>
+                        @{
+                            var dayRequests = day.SpecialRequests.ToList();
+                        }
+                        @if (dayRequests.Count == 0)
+                        {
+                            <span class="small text-muted">—</span>
+                        }
+                        else
+                        {
+                            @foreach (var request in dayRequests)
+                            {
+                                <div class="small">
+                                    <span class="badge bg-light text-dark border">@request.Type</span>
+                                    <span class="text-muted">@request.Status</span>
+                                </div>
+                            }
+                        }
+                    </td>
+
+                    <td class="text-end">£@day.TotalSpend.ToString("0.00")</td>
+                </tr>
+            }
+            </tbody>
+            <tfoot class="table-light">
+            <tr>
+                <th>Total</th>
+                <th>@week.TotalBookings</th>
+                <th colspan="2"></th>
+                <th class="text-end">£@week.TotalSpend.ToString("0.00")</th>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white"><strong>Routes travelled</strong></div>
+            @if (!week.RoutesTravelled.Any())
+            {
+                <div class="card-body text-muted small">No travel this week.</div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var route in week.RoutesTravelled)
+                    {
+                        <li class="list-group-item small">@route</li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-white"><strong>Special requests by type</strong></div>
+            @if (requestsByType.Count == 0)
+            {
+                <div class="card-body text-muted small">None this week.</div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var group in requestsByType)
+                    {
+                        <li class="list-group-item d-flex justify-content-between small">
+                            <span>@group.Key</span>
+                            <span class="badge bg-secondary">@group.Count()</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>
+
+<p class="text-muted small mt-4">
+    Generated @DateTime.Now.ToString("d MMM yyyy, HH:mm") from in-memory data.
+    Recurring bookings are expanded into their occurrences for this week.
+</p>

@@ -1,0 +1,14 @@
+@model BookingStatus
+
+@{
+    var css = Model switch
+    {
+        BookingStatus.Confirmed => "bg-success",
+        BookingStatus.Pending => "bg-warning text-dark",
+        BookingStatus.Cancelled => "bg-secondary",
+        BookingStatus.Completed => "bg-info text-dark",
+        _ => "bg-light text-dark"
+    };
+}
+
+<span class="badge @css">@Model</span>

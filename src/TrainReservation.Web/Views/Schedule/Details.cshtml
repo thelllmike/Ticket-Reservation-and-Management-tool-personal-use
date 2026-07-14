@@ -1,0 +1,46 @@
+@model TrainService
+@{
+    ViewData["Title"] = $"Train {Model.TrainNumber}";
+}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 mb-1">@Model.TrainNumber</h1>
+        <p class="text-muted mb-0">@(Model.Route?.Description ?? "—")</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Edit" asp-route-id="@Model.Id">Edit</a>
+        <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@Model.Id">Delete</a>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3 text-muted">Route</dt>
+            <dd class="col-sm-9">
+                @(Model.Route?.Description ?? "—")
+                <span class="text-muted small">(@Model.Route?.DistanceKm km)</span>
+            </dd>
+
+            <dt class="col-sm-3 text-muted">Departs</dt>
+            <dd class="col-sm-9">@Model.DepartureTime.ToString("HH\\:mm")</dd>
+
+            <dt class="col-sm-3 text-muted">Arrives</dt>
+            <dd class="col-sm-9">@Model.ArrivalTime.ToString("HH\\:mm")</dd>
+
+            <dt class="col-sm-3 text-muted">Operating days</dt>
+            <dd class="col-sm-9">
+                @foreach (var day in Model.OperatingDays.OrderBy(d => ((int)d + 6) % 7))
+                {
+                    <span class="badge bg-light text-dark border">@day</span>
+                }
+            </dd>
+
+            <dt class="col-sm-3 text-muted">Capacity</dt>
+            <dd class="col-sm-9">@Model.Capacity seats</dd>
+        </dl>
+    </div>
+</div>
+
+<a class="btn btn-link mt-3 px-0" asp-action="Index">← Back to schedule</a>

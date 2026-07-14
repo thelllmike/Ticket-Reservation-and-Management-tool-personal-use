@@ -1,0 +1,217 @@
+@model BookingFormModel
+@{
+    // The form is progressive: route + date narrow down the services, and a chosen service draws
+    // the seat map. The seat map and fares are fetched from local JSON endpoints on this same
+    // controller (see _BookingFormScripts) — never from anywhere outside the app.
+    var days = new[]
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
+        DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+    };
+}
+
+<form asp-action="@(Model.IsEdit ? "Edit" : "Create")" method="post" id="booking-form">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    @* Server-side rule failures (past date, seat clash, …) land here. *@
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+
+            <!-- Step 1 — route and date -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white"><strong>1. Where and when</strong></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label asp-for="RouteId" class="form-label"></label>
+                            <select asp-for="RouteId" id="routeId" class="form-select">
+                                <option value="0">Choose a route…</option>
+                                @foreach (var route in Model.Routes)
+                                {
+                                    <option value="@route.Id">@route.Description (@route.DistanceKm km)</option>
+                                }
+                            </select>
+                            <span asp-validation-for="RouteId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-5">
+                            <label asp-for="TravelDate" class="form-label"></label>
+                            <input asp-for="TravelDate" id="travelDate" type="date" class="form-control" />
+                            <span asp-validation-for="TravelDate" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2 — service -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white"><strong>2. Train service</strong></div>
+                <div class="card-body">
+                    <input type="hidden" asp-for="TrainServiceId" id="trainServiceId" />
+
+                    <div id="services-loading" class="text-muted small d-none">Looking up services…</div>
+
+                    <div id="services-empty" class="text-muted small">
+                        Choose a route and date to see the services that run.
+                    </div>
+
+                    <div id="services" class="list-group"></div>
+
+                    <span asp-validation-for="TrainServiceId" class="text-danger small"></span>
+                </div>
+            </div>
+
+            <!-- Step 3 — seats -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong>3. Seats</strong>
+                    <span class="small text-muted">Struck-through seats are already booked</span>
+                </div>
+                <div class="card-body">
+                    <div id="seats-empty" class="text-muted small">Pick a service first.</div>
+                    <div id="seatmap"></div>
+                    <div id="seat-inputs"></div>
+                </div>
+            </div>
+
+            <!-- Step 4 — special requests -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <strong>4. Special requests</strong>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="add-request">+ Add request</button>
+                </div>
+                <div class="card-body">
+                    <div id="requests"></div>
+                    <div id="requests-empty" class="text-muted small">No special requests. Optional.</div>
+                </div>
+            </div>
+
+            <!-- Step 5 — recurrence -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white"><strong>5. Repeat</strong></div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input asp-for="IsRecurring" class="form-check-input" id="isRecurring" />
+                        <label asp-for="IsRecurring" class="form-check-label"></label>
+                        <div class="form-text">
+                            A repeating booking is stored once. Its occurrences are generated on demand
+                            in the weekly view, so a long-running commute stays a single record.
+                        </div>
+                    </div>
+
+                    <fieldset id="recurrence" class="border rounded p-3 d-none">
+                        <div class="row g-3">
+                            <div class="col-sm-4">
+                                <label asp-for="Frequency" class="form-label"></label>
+                                <select asp-for="Frequency" class="form-select"
+                                        asp-items="Html.GetEnumSelectList<Frequency>()"></select>
+                            </div>
+
+                            <div class="col-sm-3">
+                                <label asp-for="Interval" class="form-label"></label>
+                                <input asp-for="Interval" type="number" min="1" max="12" class="form-control" />
+                                <span asp-validation-for="Interval" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-sm-5">
+                                <label class="form-label">@Html.DisplayNameFor(m => m.DaysOfWeek)</label>
+                                <div class="d-flex flex-wrap gap-1">
+                                    @foreach (var day in days)
+                                    {
+                                        var isChecked = Model.DaysOfWeek.Contains(day);
+                                        <div class="form-check form-check-inline me-1">
+                                            <input class="form-check-input" type="checkbox" name="DaysOfWeek"
+                                                   value="@day" id="day-@day" checked="@isChecked" />
+                                            <label class="form-check-label small" for="day-@day">@day.ToString()[..3]</label>
+                                        </div>
+                                    }
+                                </div>
+                                <div class="form-text">Weekly repeats only.</div>
+                            </div>
+
+                            <div class="col-sm-6">
+                                <label asp-for="RecurrenceStart" class="form-label"></label>
+                                <input asp-for="RecurrenceStart" type="date" class="form-control" />
+                            </div>
+
+                            <div class="col-sm-6">
+                                <label asp-for="RecurrenceEnd" class="form-label"></label>
+                                <input asp-for="RecurrenceEnd" type="date" class="form-control" />
+                            </div>
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm sticky-lg-top" style="top: 1rem;">
+                <div class="card-header bg-white"><strong>Summary</strong></div>
+                <div class="card-body">
+                    <dl class="row small mb-3">
+                        <dt class="col-5 text-muted">Route</dt>
+                        <dd class="col-7" id="sum-route">—</dd>
+
+                        <dt class="col-5 text-muted">Date</dt>
+                        <dd class="col-7" id="sum-date">—</dd>
+
+                        <dt class="col-5 text-muted">Train</dt>
+                        <dd class="col-7" id="sum-train">—</dd>
+
+                        <dt class="col-5 text-muted">Seats</dt>
+                        <dd class="col-7" id="sum-seats">—</dd>
+                    </dl>
+
+                    <div class="mb-3">
+                        <label asp-for="Status" class="form-label small text-muted">Status</label>
+                        <select asp-for="Status" class="form-select form-select-sm"
+                                asp-items="Html.GetEnumSelectList<BookingStatus>()"></select>
+                    </div>
+
+                    @* Recomputed live in the browser, then recomputed again on the server — the
+                       posted value is never trusted for pricing. *@
+                    <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                        <span class="text-muted">Total</span>
+                        <span class="h4 mb-0" id="sum-total">£0.00</span>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            @(Model.IsEdit ? "Save changes" : "Confirm booking")
+                        </button>
+                        <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@* Templates cloned by the JS below. *@
+<template id="tpl-request">
+    <div class="request-row border rounded p-3 mb-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-4">
+                <label class="form-label small">Type</label>
+                <select class="form-select form-select-sm" data-field="Type">
+                    @foreach (var type in Enum.GetValues<RequestType>())
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </select>
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label small">Details</label>
+                <input type="text" class="form-control form-control-sm" data-field="Description" maxlength="250" />
+            </div>
+            <div class="col-sm-2 d-grid">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-request">Remove</button>
+            </div>
+        </div>
+    </div>
+</template>

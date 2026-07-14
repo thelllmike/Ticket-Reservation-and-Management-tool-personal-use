@@ -1,0 +1,12 @@
+@model TrainServiceFormModel
+@{
+    ViewData["Title"] = "Add service";
+}
+
+<h1 class="h3 mb-4">Add a train service</h1>
+
+<partial name="_ServiceForm" model="Model" />
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

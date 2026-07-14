@@ -1,0 +1,82 @@
+@model TrainServiceFormModel
+@{
+    var days = new[]
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday,
+        DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+    };
+}
+
+<form asp-action="@(Model.IsEdit ? "Edit" : "Create")" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Id" />
+
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"
+         style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="TrainNumber" class="form-label"></label>
+                    <input asp-for="TrainNumber" class="form-control" placeholder="GR1234" />
+                    <span asp-validation-for="TrainNumber" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-8">
+                    <label asp-for="RouteId" class="form-label"></label>
+                    <select asp-for="RouteId" class="form-select">
+                        <option value="0">Choose a route…</option>
+                        @foreach (var route in Model.Routes)
+                        {
+                            <option value="@route.Id">@route.Description (@route.DistanceKm km)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="RouteId" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-3">
+                    <label asp-for="DepartureTime" class="form-label"></label>
+                    <input asp-for="DepartureTime" type="time" class="form-control" />
+                    <span asp-validation-for="DepartureTime" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-3">
+                    <label asp-for="ArrivalTime" class="form-label"></label>
+                    <input asp-for="ArrivalTime" type="time" class="form-control" />
+                    <span asp-validation-for="ArrivalTime" class="text-danger small"></span>
+                </div>
+
+                <div class="col-md-3">
+                    <label asp-for="Capacity" class="form-label"></label>
+                    <input asp-for="Capacity" type="number" min="10" max="1000" class="form-control" />
+                    <span asp-validation-for="Capacity" class="text-danger small"></span>
+                    <div class="form-text">Used to work out how full a train is.</div>
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">@Html.DisplayNameFor(m => m.OperatingDays)</label>
+                    <div class="d-flex flex-wrap gap-3">
+                        @foreach (var day in days)
+                        {
+                            var isChecked = Model.OperatingDays.Contains(day);
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="OperatingDays"
+                                       value="@day" id="op-@day" checked="@isChecked" />
+                                <label class="form-check-label" for="op-@day">@day</label>
+                            </div>
+                        }
+                    </div>
+                    <div class="form-text">A service can only be booked on the days it runs.</div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">
+                    @(Model.IsEdit ? "Save changes" : "Add service")
+                </button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Cancel</a>
+            </div>
+        </div>
+    </div>
+</form>

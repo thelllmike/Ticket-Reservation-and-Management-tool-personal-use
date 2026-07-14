@@ -1,0 +1,182 @@
+@model Booking
+@{
+    ViewData["Title"] = $"Booking {Model.Reference}";
+    var service = Model.TrainService;
+    var route = service?.Route;
+}
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="h3 mb-1">@Model.Reference</h1>
+        <p class="text-muted mb-0">@(route?.Description ?? "Unknown route")</p>
+    </div>
+    <div class="text-end">
+        <partial name="_StatusBadge" model="Model.Status" />
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white"><strong>Journey</strong></div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted">Route</dt>
+                    <dd class="col-sm-8">@(route?.Description ?? "—") <span class="text-muted small">(@route?.DistanceKm km)</span></dd>
+
+                    <dt class="col-sm-4 text-muted">Travel date</dt>
+                    <dd class="col-sm-8">
+                        @if (Model.IsRecurring)
+                        {
+                            <span class="text-muted">Recurring — see pattern below</span>
+                        }
+                        else
+                        {
+                            @Model.TravelDate.ToString("dddd d MMMM yyyy")
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted">Train</dt>
+                    <dd class="col-sm-8">
+                        @if (service is not null)
+                        {
+                            <text>@service.TrainNumber — departs @service.DepartureTime.ToString("HH\\:mm"), arrives @service.ArrivalTime.ToString("HH\\:mm")</text>
+                        }
+                        else
+                        {
+                            <text>—</text>
+                        }
+                    </dd>
+
+                    <dt class="col-sm-4 text-muted">Booked on</dt>
+                    <dd class="col-sm-8">@Model.DateCreated.ToString("d MMM yyyy, HH:mm")</dd>
+
+                    @if (Model.ParentBookingId is not null)
+                    {
+                        <dt class="col-sm-4 text-muted">Origin</dt>
+                        <dd class="col-sm-8">
+                            <span class="badge bg-light text-dark border">Split out of a recurring series</span>
+                            <div class="small text-muted mt-1">
+                                Changing this booking does not affect the rest of the series.
+                            </div>
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </div>
+
+        @if (Model.IsRecurring && Model.RecurrencePattern is not null)
+        {
+            var pattern = Model.RecurrencePattern;
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white"><strong>Repeat pattern</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4 text-muted">Frequency</dt>
+                        <dd class="col-sm-8">
+                            Every @(pattern.Interval == 1 ? "" : pattern.Interval + " ")@(pattern.Frequency switch {
+                                Frequency.Daily => pattern.Interval == 1 ? "day" : "days",
+                                Frequency.Weekly => pattern.Interval == 1 ? "week" : "weeks",
+                                _ => pattern.Interval == 1 ? "month" : "months"
+                            })
+                        </dd>
+
+                        @if (pattern.DaysOfWeek.Length > 0)
+                        {
+                            <dt class="col-sm-4 text-muted">On</dt>
+                            <dd class="col-sm-8">@string.Join(", ", pattern.DaysOfWeek)</dd>
+                        }
+
+                        <dt class="col-sm-4 text-muted">Runs</dt>
+                        <dd class="col-sm-8">@pattern.StartDate.ToString("d MMM yyyy") → @pattern.EndDate.ToString("d MMM yyyy")</dd>
+                    </dl>
+
+                    <div class="alert alert-light border mt-3 mb-0 small">
+                        Occurrences are generated on demand — they are not stored. To change a single
+                        date, open the <a asp-controller="Weekly" asp-action="Index">weekly view</a> and
+                        use “edit this one”.
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Special requests</strong>
+                <a class="btn btn-sm btn-outline-secondary"
+                   asp-controller="SpecialRequests" asp-action="Create" asp-route-bookingId="@Model.Id">+ Add</a>
+            </div>
+
+            @if (Model.SpecialRequests.Count == 0)
+            {
+                <div class="card-body text-muted">None on this booking.</div>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var request in Model.SpecialRequests)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold">@request.Type</div>
+                                <div class="small text-muted">@request.Description</div>
+                            </div>
+                            <div class="text-end text-nowrap">
+                                <span class="badge @(request.Status switch {
+                                    RequestStatus.Fulfilled => "bg-success",
+                                    RequestStatus.Declined => "bg-danger",
+                                    _ => "bg-warning text-dark"
+                                })">@request.Status</span>
+                                <a class="small d-block mt-1"
+                                   asp-controller="SpecialRequests" asp-action="Edit" asp-route-id="@request.Id">Edit</a>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white"><strong>Seats</strong></div>
+            <ul class="list-group list-group-flush">
+                @foreach (var seat in Model.Seats)
+                {
+                    <li class="list-group-item d-flex justify-content-between">
+                        <div>
+                            <span class="fw-semibold">@seat.Label</span>
+                            <span class="badge @(seat.TravelClass == TravelClass.FirstClass ? "bg-dark" : "bg-light text-dark border") ms-1">
+                                @(seat.TravelClass == TravelClass.FirstClass ? "First" : "Standard")
+                            </span>
+                        </div>
+                        <span>£@seat.Price.ToString("0.00")</span>
+                    </li>
+                }
+                <li class="list-group-item d-flex justify-content-between bg-light">
+                    <strong>Total</strong>
+                    <strong>£@Model.TotalPrice.ToString("0.00")</strong>
+                </li>
+            </ul>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white"><strong>Manage</strong></div>
+            <div class="card-body d-grid gap-2">
+                <a class="btn btn-outline-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit booking</a>
+
+                @if (Model.Status != BookingStatus.Cancelled)
+                {
+                    <form asp-action="Cancel" asp-route-id="@Model.Id" method="post"
+                          onsubmit="return confirm('Cancel this booking?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-warning w-100">Cancel booking</button>
+                    </form>
+                }
+
+                <a class="btn btn-outline-danger" asp-action="Delete" asp-route-id="@Model.Id">Delete booking</a>
+                <a class="btn btn-link" asp-action="Index">← Back to bookings</a>
+            </div>
+        </div>
+    </div>
+</div>

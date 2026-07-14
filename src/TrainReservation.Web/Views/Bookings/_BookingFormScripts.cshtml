@@ -1,0 +1,298 @@
+@model BookingFormModel
+@{
+    // The state the form starts from: the route, date, service and seats already on the model.
+    // On a fresh Create these are empty; on Edit — or when validation bounces the form back — they
+    // are what the JS below uses to rebuild the service list and re-select the chosen seats.
+    var initialState = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        routeId = Model.RouteId,
+        travelDate = Model.TravelDate.ToString("yyyy-MM-dd"),
+        serviceId = Model.TrainServiceId,
+        excludeBookingId = Model.IsEdit ? Model.Id : (int?)null,
+        seats = Model.Seats.Select(s => new
+        {
+            coach = s.Coach,
+            number = s.SeatNumber,
+            travelClass = s.TravelClass.ToString()
+        })
+    });
+}
+
+<partial name="_ValidationScriptsPartial" />
+
+<script>
+    // ---------------------------------------------------------------------------------------
+    // Booking form.
+    //
+    // Everything here talks to local endpoints on this controller only — the app makes no
+    // external calls. The browser computes a running total for feedback; the server recomputes
+    // the real price from the route distance and seat class on post.
+    // ---------------------------------------------------------------------------------------
+    (function () {
+        const initial = @Html.Raw(initialState);
+
+        const routeSel = document.getElementById('routeId');
+        const dateInput = document.getElementById('travelDate');
+        const serviceIdInput = document.getElementById('trainServiceId');
+        const servicesBox = document.getElementById('services');
+        const servicesEmpty = document.getElementById('services-empty');
+        const servicesLoading = document.getElementById('services-loading');
+        const seatmapBox = document.getElementById('seatmap');
+        const seatsEmpty = document.getElementById('seats-empty');
+        const seatInputs = document.getElementById('seat-inputs');
+
+        // Seats the user has picked, keyed by label ("B12") so a seat cannot be chosen twice.
+        const selected = new Map();
+        let fares = { standard: 0, firstClass: 0 };
+
+        // ---- Services ----------------------------------------------------------------------
+
+        async function loadServices(preselectId) {
+            const routeId = parseInt(routeSel.value, 10);
+            const date = dateInput.value;
+
+            servicesBox.innerHTML = '';
+            clearSeats();
+
+            if (!routeId || !date) {
+                servicesEmpty.classList.remove('d-none');
+                return;
+            }
+
+            servicesEmpty.classList.add('d-none');
+            servicesLoading.classList.remove('d-none');
+
+            const res = await fetch(`/Bookings/ServicesFor?routeId=${routeId}&date=${date}`);
+            const services = await res.json();
+
+            servicesLoading.classList.add('d-none');
+
+            if (!services.length) {
+                servicesEmpty.textContent = 'No services run on this route that day. Try another date.';
+                servicesEmpty.classList.remove('d-none');
+                serviceIdInput.value = 0;
+                updateSummary();
+                return;
+            }
+
+            services.forEach(s => {
+                const item = document.createElement('label');
+                item.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
+                item.innerHTML = `
+                    <input class="form-check-input m-0" type="radio" name="serviceRadio" value="${s.id}">
+                    <span class="flex-grow-1">${s.label}</span>
+                    <span class="badge bg-light text-dark border">${s.capacity} seats</span>`;
+
+                const radio = item.querySelector('input');
+                radio.checked = s.id === preselectId;
+
+                radio.addEventListener('change', () => {
+                    serviceIdInput.value = s.id;
+                    loadSeatMap(s.id);
+                    updateSummary();
+                });
+
+                servicesBox.appendChild(item);
+            });
+
+            // Keep a previously chosen service selected across a validation re-render.
+            if (preselectId && services.some(s => s.id === preselectId)) {
+                serviceIdInput.value = preselectId;
+                await loadSeatMap(preselectId);
+            } else {
+                serviceIdInput.value = 0;
+            }
+
+            updateSummary();
+        }
+
+        // ---- Seat map ----------------------------------------------------------------------
+
+        function clearSeats() {
+            selected.clear();
+            seatmapBox.innerHTML = '';
+            seatInputs.innerHTML = '';
+            seatsEmpty.classList.remove('d-none');
+            updateSummary();
+        }
+
+        async function loadSeatMap(serviceId) {
+            const date = dateInput.value;
+            if (!serviceId || !date) return;
+
+            let url = `/Bookings/SeatMapFor?serviceId=${serviceId}&date=${date}`;
+            if (initial.excludeBookingId) url += `&excludeBookingId=${initial.excludeBookingId}`;
+
+            const res = await fetch(url);
+            if (!res.ok) return;
+
+            const map = await res.json();
+            fares = { standard: map.standardPrice, firstClass: map.firstClassPrice };
+
+            seatsEmpty.classList.add('d-none');
+            seatmapBox.innerHTML = '';
+            selected.clear();
+
+            map.coaches.forEach(coach => {
+                const isFirst = coach.travelClass === 'FirstClass';
+                const price = isFirst ? fares.firstClass : fares.standard;
+
+                const wrap = document.createElement('div');
+                wrap.className = 'mb-3';
+                wrap.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold small">Coach ${coach.letter}
+                            <span class="badge ${isFirst ? 'bg-dark' : 'bg-light text-dark border'} ms-1">
+                                ${isFirst ? 'First class' : 'Standard'}
+                            </span>
+                        </span>
+                        <span class="small text-muted">£${price.toFixed(2)} per seat</span>
+                    </div>
+                    <div class="seat-grid"></div>`;
+
+                const grid = wrap.querySelector('.seat-grid');
+
+                coach.seats.forEach(seat => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-outline-secondary seat';
+                    btn.textContent = seat.label;
+                    btn.disabled = seat.taken;
+                    if (seat.taken) btn.title = 'Already booked on this service';
+
+                    btn.addEventListener('click', () => {
+                        if (selected.has(seat.label)) {
+                            selected.delete(seat.label);
+                            btn.classList.replace('btn-primary', 'btn-outline-secondary');
+                        } else {
+                            selected.set(seat.label, {
+                                coach: coach.letter,
+                                number: seat.number,
+                                travelClass: coach.travelClass,
+                                price: price
+                            });
+                            btn.classList.replace('btn-outline-secondary', 'btn-primary');
+                        }
+                        syncSeatInputs();
+                        updateSummary();
+                    });
+
+                    grid.appendChild(btn);
+                });
+
+                seatmapBox.appendChild(wrap);
+            });
+
+            // Restore seats chosen before a validation error bounced the form back.
+            if (initial.seats && initial.seats.length) {
+                initial.seats.forEach(s => {
+                    const label = s.coach + s.number;
+                    const btn = [...seatmapBox.querySelectorAll('.seat')]
+                        .find(b => b.textContent === label && !b.disabled);
+
+                    if (btn) btn.click();
+                });
+
+                initial.seats = []; // one-shot: don't re-apply on later reloads
+            }
+
+            syncSeatInputs();
+            updateSummary();
+        }
+
+        // Rebuild the hidden inputs the model binder reads (Seats[0].Coach, …).
+        function syncSeatInputs() {
+            seatInputs.innerHTML = '';
+
+            [...selected.values()].forEach((seat, i) => {
+                seatInputs.insertAdjacentHTML('beforeend', `
+                    <input type="hidden" name="Seats[${i}].Coach" value="${seat.coach}">
+                    <input type="hidden" name="Seats[${i}].SeatNumber" value="${seat.number}">
+                    <input type="hidden" name="Seats[${i}].TravelClass" value="${seat.travelClass}">`);
+            });
+        }
+
+        // ---- Summary -----------------------------------------------------------------------
+
+        function updateSummary() {
+            const routeText = routeSel.options[routeSel.selectedIndex]?.text || '—';
+            document.getElementById('sum-route').textContent = routeSel.value !== '0' ? routeText : '—';
+
+            document.getElementById('sum-date').textContent = dateInput.value || '—';
+
+            const chosen = servicesBox.querySelector('input:checked');
+            document.getElementById('sum-train').textContent =
+                chosen ? chosen.closest('label').querySelector('span').textContent.trim() : '—';
+
+            const labels = [...selected.keys()];
+            document.getElementById('sum-seats').textContent = labels.length ? labels.join(', ') : '—';
+
+            const total = [...selected.values()].reduce((sum, s) => sum + s.price, 0);
+            document.getElementById('sum-total').textContent = '£' + total.toFixed(2);
+        }
+
+        // ---- Special requests ----------------------------------------------------------------
+
+        const requestsBox = document.getElementById('requests');
+        const requestsEmpty = document.getElementById('requests-empty');
+        const tpl = document.getElementById('tpl-request');
+
+        function reindexRequests() {
+            [...requestsBox.querySelectorAll('.request-row')].forEach((row, i) => {
+                row.querySelectorAll('[data-field]').forEach(field => {
+                    field.name = `SpecialRequests[${i}].${field.dataset.field}`;
+                });
+            });
+
+            requestsEmpty.classList.toggle('d-none', requestsBox.children.length > 0);
+        }
+
+        function addRequest(type, description) {
+            const row = tpl.content.cloneNode(true).firstElementChild;
+
+            if (type) row.querySelector('[data-field="Type"]').value = type;
+            if (description) row.querySelector('[data-field="Description"]').value = description;
+
+            row.querySelector('.remove-request').addEventListener('click', () => {
+                row.remove();
+                reindexRequests();
+            });
+
+            requestsBox.appendChild(row);
+            reindexRequests();
+        }
+
+        document.getElementById('add-request').addEventListener('click', () => addRequest());
+
+        // ---- Recurrence ------------------------------------------------------------------------
+
+        const recurringToggle = document.getElementById('isRecurring');
+        const recurrenceBox = document.getElementById('recurrence');
+
+        function syncRecurrence() {
+            recurrenceBox.classList.toggle('d-none', !recurringToggle.checked);
+        }
+
+        recurringToggle.addEventListener('change', syncRecurrence);
+
+        // ---- Wire up + restore ------------------------------------------------------------------
+
+        routeSel.addEventListener('change', () => loadServices(0));
+        dateInput.addEventListener('change', () => loadServices(parseInt(serviceIdInput.value, 10) || 0));
+
+        syncRecurrence();
+
+        // Re-hydrate any special requests that came back with the model (edit, or a failed post).
+    @foreach (var request in Model.SpecialRequests)
+    {
+        @: addRequest('@request.Type', @Html.Raw(System.Text.Json.JsonSerializer.Serialize(request.Description)));
+    }
+
+        reindexRequests();
+
+        // Rebuild the services list and seat map for the route/date/service already on the model.
+        if (initial.routeId) {
+            loadServices(initial.serviceId);
+        }
+    })();
+</script>
