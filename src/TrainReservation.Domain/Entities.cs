@@ -63,6 +63,13 @@ public class Route : IEntity
 
     /// <summary>Display label used across the schedule, reports and chatbot replies.</summary>
     public string Description => $"{OriginStation.Name} → {DestinationStation.Name}";
+
+    /// <summary>
+    /// City-level label ("London → Manchester"). The full station names do not fit in the narrow
+    /// columns of the weekly grid, where truncating would hide the destination — the one thing the
+    /// user most needs to see.
+    /// </summary>
+    public string ShortDescription => $"{OriginStation.City} → {DestinationStation.City}";
 }
 
 /// <summary>

@@ -73,6 +73,12 @@ body { background-color: #f7f8fa; }
     max-width: 82%;
     padding: .6rem .85rem;
     border-radius: .9rem;
+}
+
+/* Only the prose honours the newlines the prediction service writes. Putting pre-wrap on the whole
+   bubble would also render the newlines in the supporting-figures table markup, blowing its rows
+   apart with whitespace. */
+.bubble-text {
     white-space: pre-wrap;
 }
 

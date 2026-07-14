@@ -54,7 +54,7 @@
                 {
                     <div class="d-flex mb-3 @(message.FromUser ? "justify-content-end" : "justify-content-start")">
                         <div class="bubble @(message.FromUser ? "bubble-user" : "bubble-bot")">
-                            @Format(message.Text)
+                            <div class="bubble-text">@Format(message.Text)</div>
 
                             @* Show the working behind the answer, not just the answer. *@
                             @if (message.Prediction is { SampleSize: > 0 } p)

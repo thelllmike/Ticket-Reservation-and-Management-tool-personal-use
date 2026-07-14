@@ -44,8 +44,11 @@
                         var cancelled = booking.Status == BookingStatus.Cancelled;
 
                         <div class="occurrence border rounded p-2 mb-2 @(occurrence.IsGenerated ? "recurring" : "") @(cancelled ? "cancelled" : "")">
-                            <div class="fw-semibold text-truncate" title="@(service?.Route?.Description)">
-                                @(service?.Route?.Description ?? "—")
+                            @* City names, not station names: the column is too narrow for
+                               "London King's Cross → Manchester Piccadilly", and truncating it
+                               would hide the destination. Full name is on the tooltip. *@
+                            <div class="fw-semibold" title="@(service?.Route?.Description)">
+                                @(service?.Route?.ShortDescription ?? "—")
                             </div>
 
                             <div class="text-muted">
